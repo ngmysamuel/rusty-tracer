@@ -5,6 +5,7 @@ use crate::ray::Ray;
 use crate::color::Color;
 use crate::light::Light;
 use crate::material::TextureCoords;
+use crate::material::Material;
 
 pub enum Element {
     Sphere(Sphere),
@@ -32,6 +33,12 @@ impl Element {
         match *self {
             Element::Sphere(ref s) => s.material.albedo,
             Element::Plane(ref p) => p.material.albedo,
+        }
+    }
+    pub fn material(&self) -> &Material {
+        match *self {
+            Element::Sphere(ref s) => &s.material,
+            Element::Plane(ref p) => &p.material,
         }
     }
     pub fn surface_normal(&self, hit_point: &Vector3) -> Vector3 {
@@ -76,7 +83,8 @@ pub struct Scene {
     pub fov: f64,
     pub elements: Vec<Element>,
     pub lights: Vec<Light>,
-    pub shadow_bias: f64
+    pub shadow_bias: f64,
+    pub max_recursion_depth: u32,
 }
 
 impl Scene {

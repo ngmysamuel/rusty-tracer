@@ -102,7 +102,11 @@ returning a string by reference but to make use of that returned string, do not 
 Lights are move in the opposite direction to the elements
 When you move the position of elements and lights, if you add 1 to x-value. Elements move right but Lights move left. 
 
-calling another function that is inside impl{} from within impl {} as well
+Calling another function that is inside impl scope {} from within the impl scope {} as well
+
+Getting texture coords
+
+
 
 
 Problems:

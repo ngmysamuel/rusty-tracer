@@ -5,11 +5,12 @@ use image::{DynamicImage, GenericImageView, Pixel, Rgba};
 pub struct Material {
     pub coloration: Coloration,
     pub albedo: f32,
+    pub surface: SurfaceType,
 }
 
-pub struct TextureCoords {
-    pub x: f32,
-    pub y: f32,
+pub enum SurfaceType {
+    Diffuse,
+    Reflective { reflectivity: f32 },
 }
 
 pub enum Coloration {
@@ -29,6 +30,11 @@ impl Coloration {
             }
         }
     }
+}
+
+pub struct TextureCoords {
+    pub x: f32,
+    pub y: f32,
 }
 
 fn wrap(val: f32, bound: u32) -> u32 { //to make sure that we do not go outside the sample texture file we are using as our texture i.e. DynamicImage

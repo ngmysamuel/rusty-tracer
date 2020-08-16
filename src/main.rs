@@ -11,6 +11,7 @@ use plane::Plane;
 mod scene;
 use scene::Scene;
 use crate::scene::Intersectable;
+use scene::Intersection;
 mod light;
 use light::Light;
 use crate::light::DirectionalLight;
@@ -19,6 +20,11 @@ mod material;
 use material::Material;
 use image::*;
 
+const BLACK: Color = Color {
+    red: 0.0,
+    green: 0.0,
+    blue: 0.0,
+};
 
 fn main() {
     test_can_render_scene();
@@ -28,7 +34,6 @@ pub fn render(sceneInstance: &Scene) -> DynamicImage {
     let mut image = DynamicImage::new_rgb8(sceneInstance.width, sceneInstance.height);
     let sky_blue = Rgba::from_channels(135, 206, 250, 255);
     let slate_grey = Rgba::from_channels(108, 119, 149, 255);
-    let black = Rgba::from_channels(0, 0, 0, 255);
     for x in 0..sceneInstance.width {
         for y in 0..sceneInstance.height {
             let ray = Ray::create_prime(x, y, sceneInstance);
@@ -41,40 +46,7 @@ pub fn render(sceneInstance: &Scene) -> DynamicImage {
                         blue: 0.0,
                         green: 0.0,
                     };
-                    for light in &sceneInstance.lights {
-                        let hit_point = ray.origin + (ray.direction * ele.distance);
-                        let surface_normal = ele.element.surface_normal(&hit_point);
-                        let direction_to_light = light.direction_to_light(&hit_point); //borrowed hit_point
-                        let shadow_ray = Ray {
-                            origin: hit_point + (direction_to_light * sceneInstance.shadow_bias),
-                            direction: direction_to_light,
-                        };
-                        let shadow_intersection = sceneInstance.trace(&shadow_ray);
-                        // if (x > 250 && x < 290) && (y > 160) {
-                        //     match &shadow_intersection {
-                        //         Some(blocker) => {println!("At: {} Blocked by: {}", ele.element.obj_str(), blocker.element.obj_str())},
-                        //         None => {println!("No block")}
-                        //     }
-                        // }
-                        let in_light = light.in_light(shadow_intersection, light.distance(&hit_point)); //borrowed hit_point
-                        let light_intensity = if in_light {
-                             light.intensity(&hit_point)
-                        } else { 0.0 };
-                        let light_power = (surface_normal.dot(&direction_to_light) as f32).max(0.0) * light_intensity;
-                        // if (x > 250 && x < 290) && (y > 160) {
-                        //     println!("Power: {}, Intent: {}", light_power, light_intensity)
-                        // }
-                        let light_reflected = ele.element.albedo() / std::f32::consts::PI;
-                        let light_color = light.color() * light_power * light_reflected;
-                        color = color + (ele.element.color(&hit_point) * light_color);
-                        // if (x > 250 && x < 290) && (y > 160) {
-                        //     color = Color {
-                        //         red: 0.0,
-                        //         blue: 1.0,
-                        //         green: 0.0,
-                        //     };
-                        // }
-                    }
+                    color = get_color(&sceneInstance, &ray, &ele, 0);
                     image.put_pixel(x, y, color.clamp().to_rgba());
                 },
                 None    => image.put_pixel(x, y, slate_grey),
@@ -91,6 +63,69 @@ pub fn render(sceneInstance: &Scene) -> DynamicImage {
     image
 }
 
+fn get_color(scene: &Scene, ray: &Ray, intersection: &Intersection, depth: u32) -> Color {
+    let hit_point = ray.origin + (ray.direction * intersection.distance);
+    let surface_normal = intersection.element.surface_normal(&hit_point);
+
+    let mut color = diffuse_color(scene, intersection, &hit_point, &surface_normal); //gets the normal diffuse lighting effect
+    if let material::SurfaceType::Reflective { reflectivity } = intersection.element.material().surface { //if the intersection's element's surface type matches a reflective surface
+        let reflection_ray = Ray::create_reflection(surface_normal, ray.direction, hit_point, scene.shadow_bias);
+        color = color * (1.0 - reflectivity);
+        color = color + (cast_ray(scene, &reflection_ray, depth + 1) * reflectivity);
+    }
+    color
+}
+
+fn diffuse_color(sceneInstance: &Scene, ele: &Intersection, hit_point: &Vector3, surface_normal: &Vector3) -> Color {
+    let mut color = Color {
+        red: 0.0,
+        blue: 0.0,
+        green: 0.0,
+    };
+    for light in &sceneInstance.lights {
+        let direction_to_light = light.direction_to_light(hit_point); 
+        let shadow_ray = Ray {
+            origin: *hit_point + (direction_to_light * sceneInstance.shadow_bias),
+            direction: direction_to_light,
+        };
+        let shadow_intersection = sceneInstance.trace(&shadow_ray);
+        // if (x > 250 && x < 290) && (y > 160) {
+        //     match &shadow_intersection {
+        //         Some(blocker) => {println!("At: {} Blocked by: {}", ele.element.obj_str(), blocker.element.obj_str())},
+        //         None => {println!("No block")}
+        //     }
+        // }
+        let in_light = light.in_light(shadow_intersection, light.distance(hit_point)); 
+        let light_intensity = if in_light {
+             light.intensity(&hit_point)
+        } else { 0.0 };
+        let light_power = (surface_normal.dot(&direction_to_light) as f32).max(0.0) * light_intensity;
+        // if (x > 250 && x < 290) && (y > 160) {
+        //     println!("Power: {}, Intent: {}", light_power, light_intensity)
+        // }
+        let light_reflected = ele.element.albedo() / std::f32::consts::PI;
+        let light_color = light.color() * light_power * light_reflected;
+        color = color + (ele.element.color(&hit_point) * light_color);
+        // if (x > 250 && x < 290) && (y > 160) {
+        //     color = Color {
+        //         red: 0.0,
+        //         blue: 1.0,
+        //         green: 0.0,
+        //     };
+        // }
+    }
+    color
+}
+
+pub fn cast_ray(scene: &Scene, ray: &Ray, depth: u32) -> Color {
+    if depth >= scene.max_recursion_depth {
+        return BLACK;
+    }
+
+    let intersection = scene.trace(&ray);
+    intersection.map(|i| get_color(scene, &ray, &i, depth))
+        .unwrap_or(BLACK)
+}
 
 fn test_can_render_scene() {
     let scene = Scene {
@@ -107,7 +142,8 @@ fn test_can_render_scene() {
                 radius: 1.0,
                 material: Material {
                     coloration: material::Coloration::Texture( image::open(String::from("C:/Users/samue/Documents/rust-tracer/checkerboard.png")).unwrap()  ),
-                    albedo: 0.3
+                    albedo: 0.3,
+                    surface: material::SurfaceType::Reflective {reflectivity: 0.3}
                 }
             } ), 
             scene::Element::Sphere(Sphere {
@@ -119,7 +155,8 @@ fn test_can_render_scene() {
                 radius: 1.0,
                 material: Material {
                     coloration: material::Coloration::Texture( image::open(String::from("C:/Users/samue/Documents/rust-tracer/checkerboard-2.png")).unwrap()  ),
-                    albedo: 0.3
+                    albedo: 0.3,
+                    surface: material::SurfaceType::Diffuse
                 } 
             } ),
             scene::Element::Plane(Plane {
@@ -139,7 +176,8 @@ fn test_can_render_scene() {
                         green: 0.5,
                         blue: 0.5,
                     }),
-                    albedo: 0.3 
+                    albedo: 0.3,
+                    surface: material::SurfaceType::Diffuse
                 }
             } ),
             scene::Element::Plane(Plane {
@@ -159,7 +197,8 @@ fn test_can_render_scene() {
                         green: 0.5,
                         blue: 0.5,
                     }),
-                    albedo: 0.3 
+                    albedo: 0.3,
+                    surface: material::SurfaceType::Reflective {reflectivity: 0.3}
                 }
             } ),
         ], 
@@ -180,7 +219,7 @@ fn test_can_render_scene() {
             light::Light::Spherical(SphericalLight { // x: Left (-). y: up (+) z: move away from camera (+). 
                 position: Vector3 {
                     x: -2.0,//3.5,
-                    y: 5.0,//2.0,
+                    y: 10.0,//2.0,
                     z: -3.5//-2.5,
                 },
                 intensity: 10000.0,
@@ -204,7 +243,8 @@ fn test_can_render_scene() {
                 },
             } )
         ],
-        shadow_bias: 0.000000001
+        shadow_bias: 0.000000001,
+        max_recursion_depth: 5,
     };
 
     let img: DynamicImage = render(&scene);

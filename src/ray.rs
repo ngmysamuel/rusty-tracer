@@ -26,4 +26,11 @@ impl Ray {
                 .normalize(),
         }
     }
+
+    pub fn create_reflection(normal: Vector3, incident: Vector3, intersection: Vector3, bias: f64) -> Ray {
+        Ray {
+            origin: intersection + (normal * bias),
+            direction: incident - (normal * 2.0 * incident.dot(&normal) ),
+        }
+    }
 }
