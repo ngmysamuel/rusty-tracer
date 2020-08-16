@@ -106,7 +106,7 @@ Calling another function that is inside impl scope {} from within the impl scope
 
 Getting texture coords
 
-
+Ray::create_transmission
 
 
 Problems:

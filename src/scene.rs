@@ -47,7 +47,7 @@ impl Element {
             Element::Plane(ref p) => p.surface_normal(hit_point),
         }
     }
-    fn texture_coords(&self, hit_point: &Vector3) -> TextureCoords {
+    pub fn texture_coords(&self, hit_point: &Vector3) -> TextureCoords {
         match *self {
             Element::Sphere(ref s) => s.texture_coords(hit_point),
             Element::Plane(ref p) => p.texture_coords(hit_point),

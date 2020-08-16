@@ -26,14 +26,15 @@ const BLACK: Color = Color {
     blue: 0.0,
 };
 
+
 fn main() {
     test_can_render_scene();
 }
 
 pub fn render(sceneInstance: &Scene) -> DynamicImage {
     let mut image = DynamicImage::new_rgb8(sceneInstance.width, sceneInstance.height);
-    let sky_blue = Rgba::from_channels(135, 206, 250, 255);
     let slate_grey = Rgba::from_channels(108, 119, 149, 255);
+    let sky_blue = Rgba::from_channels(135, 206, 250, 255);
     for x in 0..sceneInstance.width {
         for y in 0..sceneInstance.height {
             let ray = Ray::create_prime(x, y, sceneInstance);
@@ -67,16 +68,38 @@ fn get_color(scene: &Scene, ray: &Ray, intersection: &Intersection, depth: u32) 
     let hit_point = ray.origin + (ray.direction * intersection.distance);
     let surface_normal = intersection.element.surface_normal(&hit_point);
 
-    let mut color = diffuse_color(scene, intersection, &hit_point, &surface_normal); //gets the normal diffuse lighting effect
-    if let material::SurfaceType::Reflective { reflectivity } = intersection.element.material().surface { //if the intersection's element's surface type matches a reflective surface
-        let reflection_ray = Ray::create_reflection(surface_normal, ray.direction, hit_point, scene.shadow_bias);
-        color = color * (1.0 - reflectivity);
-        color = color + (cast_ray(scene, &reflection_ray, depth + 1) * reflectivity);
+    let material = intersection.element.material();
+    match material.surface {
+        material::SurfaceType::Diffuse => diffuse_color(scene, intersection, &hit_point, &surface_normal),
+        material::SurfaceType::Reflective { reflectivity } => {
+            let mut color = diffuse_color(scene, intersection, &hit_point, &surface_normal);
+            let reflection_ray = Ray::create_reflection(surface_normal, ray.direction, hit_point, scene.shadow_bias);
+            color = color * (1.0 - reflectivity);
+            color = color + (cast_ray(scene, &reflection_ray, depth + 1) * reflectivity);
+            color
+        }
+        material::SurfaceType::Refractive { index, transparency } => {
+            let mut refraction_color = BLACK;
+            let kr = fresnel(ray.direction, surface_normal, index) as f32;
+            let surface_color = material.coloration.color(&intersection.element.texture_coords(&hit_point));
+
+            //Calculating the refractive colors
+            if kr < 1.0 { //Fresnel > 1 means that the surface appears to be reflective. Here it behaves as it should i.e. refractions
+                let transmission_ray = Ray::create_transmission(surface_normal, ray.direction, hit_point, scene.shadow_bias, index).unwrap();
+                refraction_color = cast_ray(scene, &transmission_ray, depth + 1);
+            }
+
+            //Calculating the reflective colors
+            let reflection_ray =Ray::create_reflection(surface_normal, ray.direction, hit_point, scene.shadow_bias);
+            let reflection_color = cast_ray(scene, &reflection_ray, depth + 1);
+            let mut color = reflection_color * kr + refraction_color * (1.0 - kr);
+            color = color * transparency * surface_color;
+            color
+        }
     }
-    color
 }
 
-fn diffuse_color(sceneInstance: &Scene, ele: &Intersection, hit_point: &Vector3, surface_normal: &Vector3) -> Color {
+fn diffuse_color(sceneInstance: &Scene, ele: &Intersection, hit_point: &Vector3, surface_normal: &Vector3) -> Color { //gets the normal diffuse lighting effect
     let mut color = Color {
         red: 0.0,
         blue: 0.0,
@@ -117,6 +140,28 @@ fn diffuse_color(sceneInstance: &Scene, ele: &Intersection, hit_point: &Vector3,
     color
 }
 
+fn fresnel(incident: Vector3, normal: Vector3, index: f32) -> f64 {
+    let i_dot_n = incident.dot(&normal);
+    let mut eta_i = 1.0;
+    let mut eta_t = index as f64;
+    if i_dot_n > 0.0 {
+        eta_i = eta_t;
+        eta_t = 1.0;
+    }
+
+    let sin_t = eta_i / eta_t * (1.0 - i_dot_n * i_dot_n).max(0.0).sqrt();
+    if sin_t > 1.0 {
+        //Total internal reflection
+        return 1.0;
+    } else {
+        let cos_t = (1.0 - sin_t * sin_t).max(0.0).sqrt();
+        let cos_i = cos_t.abs();
+        let r_s = ((eta_t * cos_i) - (eta_i * cos_t)) / ((eta_t * cos_i) + (eta_i * cos_t));
+        let r_p = ((eta_i * cos_i) - (eta_t * cos_t)) / ((eta_i * cos_i) + (eta_t * cos_t));
+        return (r_s * r_s + r_p * r_p) / 2.0;
+    }
+}
+
 pub fn cast_ray(scene: &Scene, ray: &Ray, depth: u32) -> Color {
     if depth >= scene.max_recursion_depth {
         return BLACK;
@@ -129,33 +174,61 @@ pub fn cast_ray(scene: &Scene, ray: &Ray, depth: u32) -> Color {
 
 fn test_can_render_scene() {
     let scene = Scene {
-        width: 800, //800 OR 320,
-        height: 600, //600 OR 200,
+        width: 1200, //800 OR 320,
+        height: 900, //600 OR 200,
         fov: 90.0,
         elements: vec! [ 
             scene::Element::Sphere(Sphere { // z: move away from camera (-). x: Left (-). y: up (+)
                 center: Vector3 {
-                    x: 1.0,
-                    y: 1.0,
-                    z: -2.5,
+                    x: 1.3,
+                    y: 0.6,
+                    z: -3.5,
                 },
-                radius: 1.0,
+                radius: 1.5,
                 material: Material {
-                    coloration: material::Coloration::Texture( image::open(String::from("C:/Users/samue/Documents/rust-tracer/checkerboard.png")).unwrap()  ),
-                    albedo: 0.3,
+                    // coloration: material::Coloration::Texture( image::open(String::from("C:/Users/samue/Documents/rust-tracer/checkerboard.png")).unwrap()  ),
+                    coloration: material::Coloration::Color(Color  {
+                        red: 0.2,
+                        green: 1.0,
+                        blue: 0.2,
+                    }),
+                    albedo: 0.15,
                     surface: material::SurfaceType::Reflective {reflectivity: 0.3}
                 }
             } ), 
             scene::Element::Sphere(Sphere {
                 center: Vector3 {
-                    x: -2.0,
+                    x: -0.3,
+                    y: -0.3,
+                    z: -1.5, //-2.5
+                },
+                radius: 0.3,
+                material: Material {
+                    // coloration: material::Coloration::Texture( image::open(String::from("C:/Users/samue/Documents/rust-tracer/checkerboard-2.png")).unwrap()  ),
+                    coloration: material::Coloration::Color(Color  {
+                        red: 1.0,
+                        green: 1.0,
+                        blue: 1.0,
+                    }),
+                    albedo: 0.18,
+                    surface: material::SurfaceType::Refractive { index: 1.5, transparency: 0.7} //trans:1.0
+                } 
+            } ),
+            scene::Element::Sphere(Sphere {
+                center: Vector3 {
+                    x: -2.2,
                     y: 0.5,
-                    z: -3.5, //-2.5
+                    z: -2.5, //-2.5
                 },
                 radius: 1.0,
                 material: Material {
                     coloration: material::Coloration::Texture( image::open(String::from("C:/Users/samue/Documents/rust-tracer/checkerboard-2.png")).unwrap()  ),
-                    albedo: 0.3,
+                    // coloration: material::Coloration::Color(Color  {
+                    //     red: 1.0,
+                    //     green: 1.0,
+                    //     blue: 1.0,
+                    // }),
+                    albedo: 0.18,
                     surface: material::SurfaceType::Diffuse
                 } 
             } ),
@@ -171,11 +244,7 @@ fn test_can_render_scene() {
                     z: 0.0,
                 },
                 material: Material {
-                    coloration: material::Coloration::Color( Color {
-                        red: 0.5,
-                        green: 0.5,
-                        blue: 0.5,
-                    }),
+                    coloration: material::Coloration::Texture( image::open(String::from("C:/Users/samue/Documents/rust-tracer/checkerboard.png")).unwrap()  ),
                     albedo: 0.3,
                     surface: material::SurfaceType::Diffuse
                 }
@@ -184,7 +253,7 @@ fn test_can_render_scene() {
                 p0: Vector3 {
                     x: -1.0,
                     y: -1.0,
-                    z: -5.0,
+                    z: -30.0,
                 },
                 normal: Vector3 {
                     x: 0.0,
@@ -192,35 +261,31 @@ fn test_can_render_scene() {
                     z: -1.0,
                 },
                 material: Material {
-                    coloration: material::Coloration::Color( Color {
-                        red: 0.5,
-                        green: 0.5,
-                        blue: 0.5,
-                    }),
+                    coloration: material::Coloration::Color(Color::from_rgba(Rgba::from_channels(135, 206, 250, 255))),
                     albedo: 0.3,
-                    surface: material::SurfaceType::Reflective {reflectivity: 0.3}
+                    surface: material::SurfaceType::Diffuse//material::SurfaceType::Reflective {reflectivity: 0.3}
                 }
             } ),
         ], 
         lights: vec ! [
-            light::Light::Directional(DirectionalLight { // x: Left (+). y: up (-) z: move away from camera (+). 
-                direction: Vector3 {
-                    x: 0.0,
-                    y: 0.0,
-                    z: -1.0,
-                },
-                intensity: 1.0,
-                color: Color {
-                    red: 1.0,
-                    green: 1.0,
-                    blue: 1.0,
-                },
-            } ),
+            // light::Light::Directional(DirectionalLight { // x: Left (+). y: up (-) z: move away from camera (+). 
+            //     direction: Vector3 {
+            //         x: 0.0,
+            //         y: 0.0,
+            //         z: -1.0,
+            //     },
+            //     intensity: 1.0,
+            //     color: Color {
+            //         red: 1.0,
+            //         green: 1.0,
+            //         blue: 1.0,
+            //     },
+            // } ),
             light::Light::Spherical(SphericalLight { // x: Left (-). y: up (+) z: move away from camera (+). 
                 position: Vector3 {
-                    x: -2.0,//3.5,
-                    y: 10.0,//2.0,
-                    z: -3.5//-2.5,
+                    x: -3.0,//3.5,
+                    y: 5.0,//2.0,
+                    z: -1.5//-2.5,
                 },
                 intensity: 10000.0,
                 color: Color {
@@ -229,11 +294,11 @@ fn test_can_render_scene() {
                     blue: 1.0,
                 },
             } ),
-            light::Light::Spherical(SphericalLight { // x: Left (-). y: up (+) z: move away from camera (+). 
+            light::Light::Spherical(SphericalLight { // x: Left (-). y: up (+) z: move away from camera (-). 
                 position: Vector3 {
-                    x: 0.25,
+                    x: 1.0, //0.25,
                     y: 0.0,
-                    z: -2.0,
+                    z: 0.0, //-2.0,
                 },
                 intensity: 150.0,
                 color: Color {
