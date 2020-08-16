@@ -174,8 +174,8 @@ pub fn cast_ray(scene: &Scene, ray: &Ray, depth: u32) -> Color {
 
 fn test_can_render_scene() {
     let scene = Scene {
-        width: 1200, //800 OR 320,
-        height: 900, //600 OR 200,
+        width: 800, //800 OR 320 OR 1200,
+        height: 600, //600 OR 200 OR 900,
         fov: 90.0,
         elements: vec! [ 
             scene::Element::Sphere(Sphere { // z: move away from camera (-). x: Left (-). y: up (+)
@@ -249,7 +249,7 @@ fn test_can_render_scene() {
                     surface: material::SurfaceType::Diffuse
                 }
             } ),
-            scene::Element::Plane(Plane {
+            scene::Element::Plane(Plane { //the back wall
                 p0: Vector3 {
                     x: -1.0,
                     y: -1.0,
