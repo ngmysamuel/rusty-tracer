@@ -1,5 +1,7 @@
 # Beginner's Guide
 https://doc.rust-lang.org/book/ch03-05-control-flow.html
+## In simple english
+https://github.com/Dhghomon/easy_rust/blob/master/README.md
 
 # Borrowing and Ownership
 https://squidarth.com/rc/rust/2018/05/31/rust-borrowing-and-ownership.html
@@ -95,7 +97,32 @@ https://casualhacks.net/blog/2018-03-10/exploring-function-overloading/
 https://doc.rust-lang.org/rust-by-example/generics.html
 
 
+# Static and dynamic libraries
+So What Is Linking Anyway?
 
+Probably the best explanation of linking is found in The Classical Model for Linking:
+
+Back in the days when computer programs fit into a single source file, there was only one step in producing an executable file: You compile it. The compiler takes the source code, parses it according to the rules of the applicable language, generates machine code, and writes it to a file, ready to be executed.
+
+This model had quite a following, in large part because it was ridiculously fast if you had a so-called one-pass compiler.
+
+When programs got complicated enough that you couldn't fit them all into a single source file, the job was split into two parts. The compiler still did all the heavy lifting: It parsed the source code and generated machine code, but if the source code referenced a symbol that was defined in another source file, the compiler doesn't know what memory address to generate for that reference. The compiler instead generated a placeholder address and included some metadata that said, "Hey, there is a placeholder address at offset XYZ for symbol ABC." And for each symbol in the file, it also generated some metadata that said, "Hey, in case anybody asks, I have a symbol called BCD at offset WXY." These "99%-compiled" files were called object modules.
+
+The job of the linker was to finish that last 1%. It took all the object module and glued the dangling bits together. If one object module said "I have a placeholder for symbol ABC," it went and looked for any other object module that said "I have a symbol called ABC," and it filled in the placeholder with the information about ABC, known as resolving the external reference.
+
+When all the placeholders got filled in, the linker could then write out the finished executable module. And if there were any placeholders left over, you got the dreaded unresolved external error.
+
+The underlying process hasn't changed much in the last 50 years, with the main difference being when symbols get resolved.
+
+Static Linking is the name used when symbol references are resolved at compile time. This requires the compiler to have access to all the necessary object files and libraries at compile time, with the relevant chunks of code being copied into the final executable. Because all necessary code is already bundled into the executable, this tends to make programs more portable (no need for the user to install libraries) and deployment is a piece of cake (you just copy the binary to the right spot), but the binaries themselves tend to be quite bulky.
+
+Alternatively you can use Dynamic Linking to defer symbol resolution until just before the program is executed, as it gets loaded into memory. This requires the user to have a copy of all dynamically linked libraries (often called DLLs), but tends to lead to binaries that are orders of magnitude smaller. This also means multiple programs can use the same library, avoiding unnecessary duplication and allowing all programs to benefit from a library upgrade without recompilation.
+
+From: https://s3.amazonaws.com/temp.michaelfbryan.com/linking/index.html
+
+
+
+# Problems
 Returning Strings
 returning a string by reference but to make use of that returned string, do not need to dereference it
 
