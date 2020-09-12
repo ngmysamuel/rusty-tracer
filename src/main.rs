@@ -74,7 +74,7 @@ impl Reply for Png {
     }
 } 
 
-async fn body_to_string_handler(b: bytes::Bytes) -> Result<impl warp::Reply, warp::Rejection> {
+async fn tracer_route_handler(b: bytes::Bytes) -> Result<impl warp::Reply, warp::Rejection> {
     let s: &str = std::str::from_utf8(&b).unwrap();
     let scene: Scene = serde_json::from_str(s).unwrap();
 
@@ -106,11 +106,13 @@ async fn main() {
             // println!("bytes = {:?}", bytes);
             bytes
         });
-    let body_to_string_route = warp::post()
+    let tracer_route = warp::post()
         .and(warp::path("trace"))
         .and(warp::path::end())
         .and(body_to_string)
-        .and_then(body_to_string_handler);
+        .and_then(tracer_route_handler);
+
+    let routes = (tracer_route);
 
     let port = env::var("PORT")
         .unwrap_or_else(|_| "3000".to_string())
@@ -121,7 +123,6 @@ async fn main() {
         .run(([0, 0, 0, 0], port))
         .await;
     
-    // let routes = (body_to_string_route);
     // warp::serve(routes)
     //     .run(([127, 0, 0, 1], 3030))
     //     .await;    
