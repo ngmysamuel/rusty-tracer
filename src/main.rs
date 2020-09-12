@@ -81,7 +81,9 @@ async fn tracer_route_handler(b: bytes::Bytes) -> Result<impl warp::Reply, warp:
     let img: DynamicImage = render(&scene);
     assert_eq!(scene.width, img.width());
     assert_eq!(scene.height, img.height());
-    let version = img.save("./test.png");
+    let cargo_path = env!("CARGO_MANIFEST_DIR");
+    let path = format!("{}/test.png", cargo_path);
+    let version = img.save(&path);
     match version {
         Ok(_v) => {
             // println!("Alright! {:?}", v);
@@ -91,9 +93,7 @@ async fn tracer_route_handler(b: bytes::Bytes) -> Result<impl warp::Reply, warp:
             println!("error parsing: {:?}", e);
         }
     }
-    let cargo_path = env!("CARGO_MANIFEST_DIR");
-    let path = format!("{}/test.png", cargo_path);
-    println!("Path to image: {}", path);
+    println!("Path to image: {}", &path);
     Ok(Png::new(Path::new(&path)))
     // let path = format!("C:/Users/samue/Documents/rust-tracer/test.png");
 }
@@ -111,14 +111,12 @@ async fn main() {
         .and(warp::path::end())
         .and(body_to_string)
         .and_then(tracer_route_handler);
-
     let routes = (tracer_route);
 
     let port = env::var("PORT")
         .unwrap_or_else(|_| "3000".to_string())
         .parse()
         .expect("PORT must be a number");
-
     warp::serve(routes)
         .run(([0, 0, 0, 0], port))
         .await;
