@@ -117,17 +117,17 @@ async fn main() {
         .and_then(tracer_route_handler);
     let routes = (tracer_route);
 
-    // let port = env::var("PORT")
-    //     .unwrap_or_else(|_| "3000".to_string())
-    //     .parse()
-    //     .expect("PORT must be a number");
-    // warp::serve(routes)
-    //     .run(([0, 0, 0, 0], port))
-    //     .await;
-    
+    let port = env::var("PORT")
+        .unwrap_or_else(|_| "3000".to_string())
+        .parse()
+        .expect("PORT must be a number");
     warp::serve(routes)
-        .run(([127, 0, 0, 1], 3030))
-        .await;    
+        .run(([0, 0, 0, 0], port))
+        .await;
+    
+    // warp::serve(routes)
+    //     .run(([127, 0, 0, 1], 3030))
+    //     .await;    
     
     // test_can_render_scene();
 }
