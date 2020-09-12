@@ -6,7 +6,9 @@ use crate::color::Color;
 use crate::light::Light;
 use crate::material::TextureCoords;
 use crate::material::Material;
+use serde::{Serialize, Deserialize};
 
+#[derive(Clone, Deserialize)]
 pub enum Element {
     Sphere(Sphere),
     Plane(Plane),
@@ -76,7 +78,7 @@ impl Intersectable for Element {
 }
 
 
-
+#[derive(Clone, Deserialize)]
 pub struct Scene {
     pub width: u32,
     pub height: u32,

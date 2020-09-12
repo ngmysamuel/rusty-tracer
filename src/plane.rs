@@ -4,7 +4,9 @@ use crate::color::Color;
 use crate::scene::Intersectable;
 use crate::material::Material;
 use crate::material::TextureCoords;
+use serde::{Serialize, Deserialize};
 
+#[derive(Clone, Deserialize)]
 pub struct Plane {
     pub p0: Vector3,
     pub normal: Vector3,

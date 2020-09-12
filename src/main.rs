@@ -20,15 +20,113 @@ mod material;
 use material::Material;
 use image::*;
 
+use tokio::sync::Mutex;
+use warp::{Filter, http::StatusCode, filters::BoxedFilter, http::Response, Reply, http,  hyper::header::CONTENT_TYPE};
+use std::sync::Arc;
+use serde::{Serialize, Deserialize};
+use std::env;
+use std::fs::File;
+use std::io::Read;
+use std::path::{Path, PathBuf};
+use std::io;
+use std::fs;
+
 const BLACK: Color = Color {
     red: 0.0,
     green: 0.0,
     blue: 0.0,
 };
 
+struct Png {
+    inner: io::Result<File>,
+}
 
-fn main() {
-    test_can_render_scene();
+impl Png {
+    pub fn new(path: &Path) -> Self {
+         Png {inner : File::open(path)}
+    }
+}
+
+impl Reply for Png {
+    #[inline]
+    fn into_response(self) -> warp::reply::Response {
+        match self.inner {
+            Ok(mut file) => {
+                let mut data : Vec<u8> = Vec::new();
+                    match file.read_to_end(&mut data) {
+                        Err(why) => {
+                            println!("Error: {:?}", why);
+                            return Response::new(String::new().into());
+                        }
+                        Ok(_) => {
+                            let mut res = Response::new(data.into());
+                            res.headers_mut()
+                                .insert(CONTENT_TYPE, http::HeaderValue::from_static("image/png"));
+                            return res;
+                        },
+                    }
+            }
+            Err(why) => {
+                println!("Error: {:?}", why);
+                return Response::new(String::new().into());
+            }
+        }
+    }
+} 
+
+async fn body_to_string_handler(b: bytes::Bytes) -> Result<impl warp::Reply, warp::Rejection> {
+    let s: &str = std::str::from_utf8(&b).unwrap();
+    let scene: Scene = serde_json::from_str(s).unwrap();
+
+    let img: DynamicImage = render(&scene);
+    assert_eq!(scene.width, img.width());
+    assert_eq!(scene.height, img.height());
+    let version = img.save("./test.png");
+    match version {
+        Ok(_v) => {
+            // println!("Alright! {:?}", v);
+            println!("Alright! Image created");
+        },
+        Err(e) => {
+            println!("error parsing: {:?}", e);
+        }
+    }
+    let cargo_path = env!("CARGO_MANIFEST_DIR");
+    let path = format!("{}/test.png", cargo_path);
+    println!("Path to image: {}", path);
+    Ok(Png::new(Path::new(&path)))
+    // let path = format!("C:/Users/samue/Documents/rust-tracer/test.png");
+}
+
+#[tokio::main]
+async fn main() {
+    let body_to_string = warp::body::content_length_limit(1024 * 32)
+        .and(warp::body::bytes())
+        .map(|bytes: bytes::Bytes| {
+            // println!("bytes = {:?}", bytes);
+            bytes
+        });
+    let body_to_string_route = warp::post()
+        .and(warp::path("trace"))
+        .and(warp::path::end())
+        .and(body_to_string)
+        .and_then(body_to_string_handler);
+
+    let port = env::var("PORT")
+        .unwrap_or_else(|_| "3000".to_string())
+        .parse()
+        .expect("PORT must be a number");
+
+    warp::serve(routes)
+        .run(([0, 0, 0, 0], port))
+        .await;
+    
+    // let routes = (body_to_string_route);
+    // warp::serve(routes)
+    //     .run(([127, 0, 0, 1], 3030))
+    //     .await;    
+    
+    // test_can_render_scene();
 }
 
 pub fn render(sceneInstance: &Scene) -> DynamicImage {

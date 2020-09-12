@@ -1,6 +1,7 @@
 // use image;
 use std::ops::{Mul, Add};
 use image::{Pixel, Rgba};
+use serde::{Serialize, Deserialize};
 
 const GAMMA: f32 = 2.2;
 
@@ -12,7 +13,7 @@ fn gamma_decode(encoded: f32) -> f32 {
     encoded.powf(GAMMA)
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize, Copy)]
 pub struct Color {
     pub red: f32,
     pub green: f32,

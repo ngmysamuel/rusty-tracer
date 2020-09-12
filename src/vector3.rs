@@ -1,7 +1,8 @@
 //implemented Py's __sub__ -> https://stackoverflow.com/questions/51844745/how-do-i-implement-one-of-the-stdopsadd-sub-mul-div-operators-without-mo
 use std::ops::{Sub, Mul, Add, Neg};
+use serde::{Serialize, Deserialize};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct Vector3 {
     pub x: f64,
     pub y: f64,

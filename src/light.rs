@@ -2,18 +2,22 @@ use crate::vector3::Vector3;
 use crate::color::Color;
 // use crate::point::Point;
 use crate::scene::Intersection;
+use serde::{Serialize, Deserialize};
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum Light {
     Directional(DirectionalLight),
     Spherical(SphericalLight),
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct DirectionalLight {
     pub direction: Vector3,
     pub color: Color,
     pub intensity: f32,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SphericalLight {
     pub position: Vector3,
     pub color: Color,
